@@ -3,7 +3,7 @@ Set-StrictMode -Version Latest
 
 $script:CavaLocalProfile = 'conjunta3p'
 $script:CavaLocalNamespace = 'cavalocal'
-$script:CavaLocalRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$script:CavaLocalRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 
 function Assert-CavaLocalCommand {
     param(

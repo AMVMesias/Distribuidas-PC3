@@ -5,7 +5,7 @@ profile="conjunta3p"
 
 if [[ "${1:-}" != "$profile" ]]; then
   echo "Operación cancelada. Para eliminar el clúster aislado ejecuta:" >&2
-  echo "  ./scripts/destroy.sh $profile" >&2
+  echo "  ./scripts/wsl-linux/destroy.sh $profile" >&2
   exit 1
 fi
 

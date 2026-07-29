@@ -2,7 +2,7 @@
 set -euo pipefail
 
 profile="conjunta3p"
-project_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+project_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 if ! minikube status -p "$profile" >/dev/null 2>&1; then
   echo "Iniciando el perfil aislado '$profile'..."

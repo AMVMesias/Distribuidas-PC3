@@ -15,7 +15,7 @@ if (-not (Test-CavaLocalAdministrator)) {
 
 $hostState = [string](& minikube status -p $script:CavaLocalProfile --format '{{.Host}}' 2>$null)
 if ($hostState.Trim() -ne 'Running') {
-    throw "El perfil '$script:CavaLocalProfile' no está iniciado. Ejecuta primero .\scripts\deploy.ps1."
+    throw "El perfil '$script:CavaLocalProfile' no está iniciado. Ejecuta primero .\scripts\windows\deploy.ps1."
 }
 
 Set-CavaLocalContext

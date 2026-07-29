@@ -3,9 +3,9 @@ set -euo pipefail
 
 profile="conjunta3p"
 namespace="cavalocal"
-project_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+project_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
-"$project_dir/scripts/build.sh"
+"$project_dir/scripts/wsl-linux/build.sh"
 
 kubectl config use-context "$profile" >/dev/null
 [[ "$(kubectl config current-context)" == "$profile" ]] || {
@@ -28,5 +28,5 @@ echo "CavaLocal está desplegado."
 echo "IP del perfil: $cluster_ip"
 echo "Para acceder sin escribir un puerto:"
 echo "  1. Configura en Windows: 127.0.0.1 conjunta3p.espe.edu.ec"
-echo "  2. Ejecuta en otra terminal: ./scripts/tunnel.sh"
+echo "  2. Ejecuta en otra terminal: ./scripts/wsl-linux/tunnel.sh"
 echo "Dashboard: http://conjunta3p.espe.edu.ec/dashboard/"

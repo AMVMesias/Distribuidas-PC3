@@ -45,5 +45,5 @@ Write-Host ''
 Write-Host 'CavaLocal está desplegado.'
 Write-Host "IP del perfil: $($clusterIp.Trim())"
 Write-Host 'Para acceder sin escribir un puerto, abre PowerShell como administrador y ejecuta:'
-Write-Host '  .\scripts\tunnel.ps1 -ConfigureHosts'
+Write-Host '  .\scripts\windows\tunnel.ps1 -ConfigureHosts'
 Write-Host 'Dashboard: http://conjunta3p.espe.edu.ec/dashboard/'

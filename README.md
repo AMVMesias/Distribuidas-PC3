@@ -96,13 +96,55 @@ Cada mensaje tiene un `eventId` único. La cola se comparte entre las dos répli
 
 Los dos flujos usan exclusivamente el perfil `conjunta3p`. Ningún script inicia, detiene, consulta o elimina el perfil predeterminado `minikube`.
 
+La guía corta para elegir carpeta y comando está en [`scripts/README.md`](scripts/README.md).
+
+### Diferencia entre `deploy` y `kubectl apply`
+
+> **En una computadora nueva no ejecutes solamente `kubectl apply -f k8s/`.** Ese comando no lee los `Dockerfile`, no compila el código y no ejecuta los archivos de `scripts/`.
+
+El despliegue completo ocurre en este orden:
+
+```text
+deploy.ps1 o deploy.sh
+│
+├── 1. Verifica Docker, Minikube y kubectl
+├── 2. Inicia solamente el perfil conjunta3p
+├── 3. Habilita el addon Ingress
+├── 4. Ejecuta build.ps1 o build.sh
+│      ├── construye cavalocal-backend:local
+│      ├── construye cavalocal-audit:local
+│      ├── construye cavalocal-dashboard:local
+│      └── construye cavalocal-web:local
+└── 5. Ejecuta kubectl apply -f k8s/
+       └── Kubernetes crea StatefulSets, Deployments, Services, Job e Ingress
+```
+
+`kubectl apply` solamente lee los manifiestos YAML. Cuando encuentra, por ejemplo:
+
+```yaml
+image: cavalocal-backend:local
+imagePullPolicy: IfNotPresent
+```
+
+espera que esa imagen ya exista dentro de `conjunta3p`. Si no se ejecutó antes el build, los pods pueden terminar en `ImagePullBackOff`.
+
+Los `initContainers` y el Job `backend-seed` sí son ejecutados por Kubernetes porque están declarados dentro de los YAML. Los archivos externos `.ps1` y `.sh` nunca son ejecutados automáticamente por `kubectl apply`.
+
+| Situación | Comando correcto |
+|---|---|
+| Primera instalación en Windows | `.\scripts\windows\deploy.ps1` |
+| Primera instalación en WSL/Linux | `./scripts/wsl-linux/deploy.sh` |
+| Cambió código de backend, auditoría o frontend | Volver a ejecutar `deploy.ps1` o `deploy.sh` |
+| Solo cambió un manifiesto y las imágenes ya existen | `kubectl --context conjunta3p apply -f k8s/` |
+| Solo comprobar recursos | `status.ps1` o `status.sh` |
+
 ### Opción A: Windows nativo con Docker Desktop
 
 Inicia Docker Desktop y abre PowerShell en la raíz del repositorio. No necesitas WSL:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process Bypass
-.\scripts\deploy.ps1
+.\scripts\windows\deploy.ps1
 ```
 
 El script comprueba Docker, crea o reutiliza únicamente `conjunta3p`, habilita Ingress, construye las imágenes localmente y aplica Kubernetes.
@@ -111,7 +153,7 @@ Para exponer el dominio sin escribir `:80` ni `:8080`, abre otra ventana de Powe
 
 ```powershell
 Set-ExecutionPolicy -Scope Process Bypass
-.\scripts\tunnel.ps1 -ConfigureHosts
+.\scripts\windows\tunnel.ps1 -ConfigureHosts
 ```
 
 La opción `-ConfigureHosts` administra solo la entrada de CavaLocal y deja:
@@ -125,9 +167,9 @@ Mantén esa ventana abierta mientras utilizas la aplicación. HTTP emplea el pue
 Comandos nativos adicionales:
 
 ```powershell
-.\scripts\build.ps1
-.\scripts\status.ps1
-.\scripts\destroy.ps1 -Profile conjunta3p
+.\scripts\windows\build.ps1
+.\scripts\windows\status.ps1
+.\scripts\windows\destroy.ps1 -Profile conjunta3p
 ```
 
 La eliminación exige literalmente `-Profile conjunta3p`; no acepta otro nombre.
@@ -137,8 +179,8 @@ La eliminación exige literalmente `-Profile conjunta3p`; no acepta otro nombre.
 Entra al repositorio montado en `/mnt/c/...` y ejecuta:
 
 ```bash
-chmod +x scripts/*.sh
-./scripts/deploy.sh
+chmod +x scripts/wsl-linux/*.sh
+./scripts/wsl-linux/deploy.sh
 ```
 
 Después configura en el archivo `hosts` de Windows:
@@ -150,7 +192,7 @@ Después configura en el archivo `hosts` de Windows:
 En otra terminal WSL inicia el túnel y déjala abierta:
 
 ```bash
-./scripts/tunnel.sh
+./scripts/wsl-linux/tunnel.sh
 ```
 
 El túnel puede solicitar la contraseña `sudo` para publicar los puertos privilegiados 80 y 443.
@@ -158,10 +200,8 @@ El túnel puede solicitar la contraseña `sudo` para publicar los puertos privil
 También se puede ejecutar el paso evaluado manualmente:
 
 ```bash
-./scripts/build.sh
-kubectl config use-context conjunta3p
-cd k8s
-kubectl apply -f .
+./scripts/wsl-linux/build.sh
+kubectl --context conjunta3p apply -f k8s/
 ```
 
 No uses `minikube start` sin `-p conjunta3p`: ese comando podría reanudar otro proyecto guardado en el perfil predeterminado.
@@ -179,30 +219,30 @@ En Windows también puedes apuntar el dominio directamente a la IP devuelta por 
 
 ```powershell
 $ip = minikube ip -p conjunta3p
-.\scripts\configure-hosts.ps1 -Address $ip
+.\scripts\windows\configure-hosts.ps1 -Address $ip
 ```
 
 Si el túnel ejecutado en WSL no fuera visible desde Windows, existe un puente alternativo no privilegiado:
 
 ```bash
-./scripts/access-windows.sh
+./scripts/wsl-linux/access-windows.sh
 ```
 
-Esa alternativa sí usa `http://conjunta3p.espe.edu.ec:8080/` y se detiene con `./scripts/stop-windows-access.sh`. No es necesaria cuando `minikube tunnel -p conjunta3p` ya funciona.
+Esa alternativa sí usa `http://conjunta3p.espe.edu.ec:8080/` y se detiene con `./scripts/wsl-linux/stop-windows-access.sh`. No es necesaria cuando `minikube tunnel -p conjunta3p` ya funciona.
 
 ### Verificación
 
 Comprueba todos los recursos:
 
 ```bash
-./scripts/status.sh
+./scripts/wsl-linux/status.sh
 kubectl --context conjunta3p get pods -n cavalocal
 ```
 
 En PowerShell nativo el equivalente es:
 
 ```powershell
-.\scripts\status.ps1
+.\scripts\windows\status.ps1
 kubectl --context conjunta3p get pods -n cavalocal
 ```
 
@@ -211,7 +251,7 @@ Los pods esperados son PostgreSQL, RabbitMQ, backend, frontend, dashboard y dos 
 Para producir un primer evento desde WSL:
 
 ```bash
-./scripts/smoke-test.sh
+./scripts/wsl-linux/smoke-test.sh
 ```
 
 También puedes hacerlo manualmente:
@@ -228,7 +268,7 @@ El evento debe aparecer en el dashboard en menos de dos segundos. Usa un correo 
 Para comprobar automáticamente que el backend continúa funcionando durante una caída temporal de RabbitMQ:
 
 ```bash
-./scripts/resilience-test.sh
+./scripts/wsl-linux/resilience-test.sh
 ```
 
 Filtros REST disponibles:
@@ -244,7 +284,7 @@ GET /api/audit/stream
 
 ### Configuración y secretos
 
-`k8s/01-config.yaml` contiene credenciales académicas locales para que la evaluación sea reproducible con un solo `kubectl apply`. No deben reutilizarse en producción.
+`k8s/01-config.yaml` contiene credenciales académicas locales para que, una vez construidas las imágenes, todos los recursos Kubernetes se creen con un solo `kubectl apply`. No deben reutilizarse en producción.
 
 Variables principales:
 
@@ -275,7 +315,7 @@ kubectl --context conjunta3p -n cavalocal create secret generic cavalocal-secret
 WSL/Linux:
 
 ```bash
-./scripts/status.sh
+./scripts/wsl-linux/status.sh
 kubectl --context conjunta3p logs -n cavalocal deployment/audit-service
 kubectl --context conjunta3p scale deployment/audit-service -n cavalocal --replicas=2
 ```
@@ -283,25 +323,25 @@ kubectl --context conjunta3p scale deployment/audit-service -n cavalocal --repli
 La destrucción exige escribir el perfil exacto y jamás usa el perfil predeterminado:
 
 ```bash
-./scripts/destroy.sh conjunta3p
+./scripts/wsl-linux/destroy.sh conjunta3p
 ```
 
 Windows nativo:
 
 ```powershell
-.\scripts\status.ps1
+.\scripts\windows\status.ps1
 kubectl --context conjunta3p logs -n cavalocal deployment/audit-service
-.\scripts\destroy.ps1 -Profile conjunta3p
+.\scripts\windows\destroy.ps1 -Profile conjunta3p
 ```
 
 ### Solución de problemas
 
 - PowerShell bloquea scripts: ejecuta `Set-ExecutionPolicy -Scope Process Bypass`; solo afecta la ventana actual.
 - Docker no responde: inicia Docker Desktop y espera a que indique que el motor está listo.
-- `ImagePullBackOff`: ejecuta nuevamente `./scripts/build.sh` o `.\scripts\build.ps1`; las imágenes son locales al perfil `conjunta3p`.
+- `ImagePullBackOff`: ejecuta nuevamente `./scripts/wsl-linux/build.sh` o `.\scripts\windows\build.ps1`; las imágenes son locales al perfil `conjunta3p`.
 - Ingress sin dirección: espera uno o dos minutos y revisa `kubectl --context conjunta3p get pods -n ingress-nginx`.
 - Dominio sin respuesta: confirma la línea `127.0.0.1 conjunta3p.espe.edu.ec`, limpia la caché DNS de Windows y comprueba que el túnel siga abierto.
-- Job de seed fallido tras conservar un PVC antiguo: elimina únicamente el perfil de Conjunta con `./scripts/destroy.sh conjunta3p` y vuelve a desplegar.
+- Job de seed fallido tras conservar un PVC antiguo: elimina únicamente el perfil de Conjunta con `./scripts/wsl-linux/destroy.sh conjunta3p` o `.\scripts\windows\destroy.ps1 -Profile conjunta3p` y vuelve a desplegar.
 - RabbitMQ temporalmente caído: el backend continúa atendiendo y conserva hasta 500 eventos en memoria para reintento; el búfer se pierde si el pod reinicia.
 
 ## Licencia
