@@ -25,5 +25,8 @@ kubectl wait --for=condition=complete job/backend-seed -n "$namespace" --timeout
 cluster_ip="$(minikube ip -p "$profile")"
 echo
 echo "CavaLocal está desplegado."
-echo "Agrega a tu archivo hosts: $cluster_ip conjunta3p.espe.edu.ec"
+echo "IP del perfil: $cluster_ip"
+echo "Para acceder sin escribir un puerto:"
+echo "  1. Configura en Windows: 127.0.0.1 conjunta3p.espe.edu.ec"
+echo "  2. Ejecuta en otra terminal: ./scripts/tunnel.sh"
 echo "Dashboard: http://conjunta3p.espe.edu.ec/dashboard/"

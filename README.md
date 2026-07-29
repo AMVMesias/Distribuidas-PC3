@@ -88,26 +88,72 @@ Cada mensaje tiene un `eventId` único. La cola se comparte entre las dos répli
 
 ### Requisitos
 
-- WSL Ubuntu con Docker, Minikube y `kubectl`.
+- Una de estas dos configuraciones:
+  - Windows nativo con Docker Desktop, Minikube y `kubectl` disponibles en PowerShell.
+  - WSL Ubuntu con Docker, Minikube y `kubectl`.
 - Al menos 4 CPU y 6 GB de RAM disponibles para el perfil.
 - Puertos y acceso de administrador para modificar el archivo `hosts` de Windows.
 
-### Despliegue rápido
+Los dos flujos usan exclusivamente el perfil `conjunta3p`. Ningún script inicia, detiene, consulta o elimina el perfil predeterminado `minikube`.
 
-Ejecuta desde WSL, entrando primero al repositorio montado en `/mnt/c/...`:
+### Opción A: Windows nativo con Docker Desktop
+
+Inicia Docker Desktop y abre PowerShell en la raíz del repositorio. No necesitas WSL:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\scripts\deploy.ps1
+```
+
+El script comprueba Docker, crea o reutiliza únicamente `conjunta3p`, habilita Ingress, construye las imágenes localmente y aplica Kubernetes.
+
+Para exponer el dominio sin escribir `:80` ni `:8080`, abre otra ventana de PowerShell **como administrador**, entra al repositorio y ejecuta:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\scripts\tunnel.ps1 -ConfigureHosts
+```
+
+La opción `-ConfigureHosts` administra solo la entrada de CavaLocal y deja:
+
+```text
+127.0.0.1   conjunta3p.espe.edu.ec
+```
+
+Mantén esa ventana abierta mientras utilizas la aplicación. HTTP emplea el puerto 80 por defecto, por eso la URL no necesita mostrarlo. Para detener el túnel usa `Ctrl+C`.
+
+Comandos nativos adicionales:
+
+```powershell
+.\scripts\build.ps1
+.\scripts\status.ps1
+.\scripts\destroy.ps1 -Profile conjunta3p
+```
+
+La eliminación exige literalmente `-Profile conjunta3p`; no acepta otro nombre.
+
+### Opción B: WSL/Linux
+
+Entra al repositorio montado en `/mnt/c/...` y ejecuta:
 
 ```bash
 chmod +x scripts/*.sh
 ./scripts/deploy.sh
 ```
 
-El script realiza exclusivamente estas operaciones:
+Después configura en el archivo `hosts` de Windows:
 
-1. Inicia `minikube -p conjunta3p` con driver Docker.
-2. Selecciona el contexto `conjunta3p`.
-3. Habilita el addon ingress en ese perfil.
-4. Construye las cuatro imágenes dentro del perfil.
-5. Ejecuta `kubectl apply -f k8s/` y espera los rollouts.
+```text
+127.0.0.1   conjunta3p.espe.edu.ec
+```
+
+En otra terminal WSL inicia el túnel y déjala abierta:
+
+```bash
+./scripts/tunnel.sh
+```
+
+El túnel puede solicitar la contraseña `sudo` para publicar los puertos privilegiados 80 y 443.
 
 También se puede ejecutar el paso evaluado manualmente:
 
@@ -122,31 +168,27 @@ No uses `minikube start` sin `-p conjunta3p`: ese comando podría reanudar otro 
 
 ### Dominio local
 
-Obtén la IP:
-
-```bash
-minikube ip -p conjunta3p
-```
-
-Abre PowerShell como administrador y agrega la línea al archivo de Windows:
-
-```powershell
-$ip = wsl -d Ubuntu -- minikube ip -p conjunta3p
-Add-Content -Path "$env:SystemRoot\System32\drivers\etc\hosts" -Value "$ip conjunta3p.espe.edu.ec"
-```
-
-Después abre:
+Con el túnel activo y `127.0.0.1 conjunta3p.espe.edu.ec` configurado, abre:
 
 - Frontend: `http://conjunta3p.espe.edu.ec/`
 - Backend/Swagger: `http://conjunta3p.espe.edu.ec/api/docs`
 - API de auditoría: `http://conjunta3p.espe.edu.ec/api/audit`
 - Dashboard SSE: `http://conjunta3p.espe.edu.ec/dashboard/`
 
-Si Minikube con driver Docker no expone directamente la IP desde Windows, mantén en WSL otra terminal con:
+En Windows también puedes apuntar el dominio directamente a la IP devuelta por `minikube ip -p conjunta3p` cuando el driver permita alcanzarla. El script acepta esa variante:
+
+```powershell
+$ip = minikube ip -p conjunta3p
+.\scripts\configure-hosts.ps1 -Address $ip
+```
+
+Si el túnel ejecutado en WSL no fuera visible desde Windows, existe un puente alternativo no privilegiado:
 
 ```bash
-minikube tunnel -p conjunta3p
+./scripts/access-windows.sh
 ```
+
+Esa alternativa sí usa `http://conjunta3p.espe.edu.ec:8080/` y se detiene con `./scripts/stop-windows-access.sh`. No es necesaria cuando `minikube tunnel -p conjunta3p` ya funciona.
 
 ### Verificación
 
@@ -154,6 +196,13 @@ Comprueba todos los recursos:
 
 ```bash
 ./scripts/status.sh
+kubectl --context conjunta3p get pods -n cavalocal
+```
+
+En PowerShell nativo el equivalente es:
+
+```powershell
+.\scripts\status.ps1
 kubectl --context conjunta3p get pods -n cavalocal
 ```
 
@@ -223,6 +272,8 @@ kubectl --context conjunta3p -n cavalocal create secret generic cavalocal-secret
 
 ### Operación y limpieza
 
+WSL/Linux:
+
 ```bash
 ./scripts/status.sh
 kubectl --context conjunta3p logs -n cavalocal deployment/audit-service
@@ -235,11 +286,21 @@ La destrucción exige escribir el perfil exacto y jamás usa el perfil predeterm
 ./scripts/destroy.sh conjunta3p
 ```
 
+Windows nativo:
+
+```powershell
+.\scripts\status.ps1
+kubectl --context conjunta3p logs -n cavalocal deployment/audit-service
+.\scripts\destroy.ps1 -Profile conjunta3p
+```
+
 ### Solución de problemas
 
-- `ImagePullBackOff`: ejecuta nuevamente `./scripts/build.sh`; las imágenes son locales al perfil `conjunta3p`.
+- PowerShell bloquea scripts: ejecuta `Set-ExecutionPolicy -Scope Process Bypass`; solo afecta la ventana actual.
+- Docker no responde: inicia Docker Desktop y espera a que indique que el motor está listo.
+- `ImagePullBackOff`: ejecuta nuevamente `./scripts/build.sh` o `.\scripts\build.ps1`; las imágenes son locales al perfil `conjunta3p`.
 - Ingress sin dirección: espera uno o dos minutos y revisa `kubectl --context conjunta3p get pods -n ingress-nginx`.
-- Dominio sin respuesta: confirma `minikube ip -p conjunta3p`, limpia la caché DNS de Windows o usa `minikube tunnel -p conjunta3p`.
+- Dominio sin respuesta: confirma la línea `127.0.0.1 conjunta3p.espe.edu.ec`, limpia la caché DNS de Windows y comprueba que el túnel siga abierto.
 - Job de seed fallido tras conservar un PVC antiguo: elimina únicamente el perfil de Conjunta con `./scripts/destroy.sh conjunta3p` y vuelve a desplegar.
 - RabbitMQ temporalmente caído: el backend continúa atendiendo y conserva hasta 500 eventos en memoria para reintento; el búfer se pierde si el pod reinicia.
 
