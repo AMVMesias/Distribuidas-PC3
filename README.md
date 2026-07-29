@@ -162,6 +162,12 @@ Los pods esperados son PostgreSQL, RabbitMQ, backend, frontend, dashboard y dos 
 Para producir un primer evento desde WSL:
 
 ```bash
+./scripts/smoke-test.sh
+```
+
+También puedes hacerlo manualmente:
+
+```bash
 curl -X POST http://conjunta3p.espe.edu.ec/api/auth/register \
   -H 'Content-Type: application/json' \
   -d '{"name":"Prueba Auditoría","email":"auditoria1@example.com","password":"Segura123"}'
@@ -169,6 +175,12 @@ curl 'http://conjunta3p.espe.edu.ec/api/audit?entity=user&action=create'
 ```
 
 El evento debe aparecer en el dashboard en menos de dos segundos. Usa un correo diferente si repites la prueba.
+
+Para comprobar automáticamente que el backend continúa funcionando durante una caída temporal de RabbitMQ:
+
+```bash
+./scripts/resilience-test.sh
+```
 
 Filtros REST disponibles:
 
