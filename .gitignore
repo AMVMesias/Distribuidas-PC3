@@ -24,6 +24,7 @@ coverage/
 # ---------- Trabajo académico y mockups (excluidos a pedido) ----------
 *.docx
 Fotos/
+EVALUACION_CONJUNTA.md
 
 # ---------- Scratch de orquestación (briefs/reports/reviews SDD) ----------
 .superpowers/

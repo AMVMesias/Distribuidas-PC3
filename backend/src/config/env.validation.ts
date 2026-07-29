@@ -37,6 +37,18 @@ export class EnvironmentVariables {
   @IsOptional()
   @IsString()
   MAIL_APP_PASSWORD?: string;
+
+  @IsOptional()
+  @IsString()
+  RABBITMQ_URL?: string;
+
+  @IsOptional()
+  @IsString()
+  AUDIT_EXCHANGE?: string;
+
+  @IsOptional()
+  @IsString()
+  AUDIT_BUFFER_SIZE?: string;
 }
 
 export function validateEnv(config: Record<string, unknown>): EnvironmentVariables {

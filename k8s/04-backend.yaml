@@ -1,0 +1,124 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: cavalocal
+spec:
+  selector:
+    app: backend
+  ports:
+    - name: http
+      port: 3001
+      targetPort: 3001
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: cavalocal
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      initContainers:
+        - name: wait-postgres
+          image: postgres:16-alpine
+          command: ["sh", "-c", "until pg_isready -h postgres -U postgres -d cavalocal; do sleep 2; done"]
+        - name: migrate
+          image: cavalocal-backend:local
+          imagePullPolicy: IfNotPresent
+          command: ["npx", "prisma", "migrate", "deploy"]
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: cavalocal-secrets
+                  key: BACKEND_DATABASE_URL
+      containers:
+        - name: backend
+          image: cavalocal-backend:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3001
+          envFrom:
+            - configMapRef:
+                name: cavalocal-config
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: cavalocal-secrets
+                  key: BACKEND_DATABASE_URL
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: cavalocal-secrets
+                  key: JWT_SECRET
+          resources:
+            requests:
+              cpu: 100m
+              memory: 192Mi
+            limits:
+              cpu: 700m
+              memory: 512Mi
+          startupProbe:
+            httpGet:
+              path: /api/health/live
+              port: 3001
+            failureThreshold: 30
+            periodSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /api/health/ready
+              port: 3001
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /api/health/live
+              port: 3001
+            periodSeconds: 15
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: backend-seed
+  namespace: cavalocal
+spec:
+  backoffLimit: 4
+  template:
+    metadata:
+      labels:
+        app: backend-seed
+    spec:
+      restartPolicy: Never
+      initContainers:
+        - name: wait-postgres
+          image: postgres:16-alpine
+          command: ["sh", "-c", "until pg_isready -h postgres -U postgres -d cavalocal; do sleep 2; done"]
+        - name: migrate
+          image: cavalocal-backend:local
+          imagePullPolicy: IfNotPresent
+          command: ["npx", "prisma", "migrate", "deploy"]
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: cavalocal-secrets
+                  key: BACKEND_DATABASE_URL
+      containers:
+        - name: seed
+          image: cavalocal-backend:local
+          imagePullPolicy: IfNotPresent
+          command: ["node", "dist/prisma/seed.js"]
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: cavalocal-secrets
+                  key: BACKEND_DATABASE_URL

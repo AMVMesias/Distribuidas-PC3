@@ -15,7 +15,7 @@ export class ReviewsController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Crear o actualizar mi reseña de un vino' })
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateReviewDto) {
-    return this.service.createOrUpdate(user.userId, dto);
+    return this.service.createOrUpdate(user.userId, dto, user.email);
   }
 
   @Get('wines/:wineId/reviews')

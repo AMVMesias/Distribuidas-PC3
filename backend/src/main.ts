@@ -18,6 +18,7 @@ async function bootstrap() {
 
   const corsOrigins = config.get<string[]>('corsOrigins') ?? ['*'];
   app.enableCors({ origin: corsOrigins.includes('*') ? true : corsOrigins });
+  app.setGlobalPrefix('api');
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('CavaLocal API')
@@ -26,11 +27,11 @@ async function bootstrap() {
     .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('docs', app, document);
+  SwaggerModule.setup('api/docs', app, document);
 
   const port = config.get<number>('port') ?? 3001;
   await app.listen(port);
   // eslint-disable-next-line no-console
-  console.log(`CavaLocal backend en http://localhost:${port} — Swagger en /docs`);
+  console.log(`CavaLocal backend en http://localhost:${port}/api — Swagger en /api/docs`);
 }
 bootstrap();

@@ -1,10 +1,11 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PaymentsService } from '../payments/payments.service';
 import { EmailService } from '../notifications/email.service';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { PayReservationDto } from './dto/pay-reservation.dto';
+import { AuditPublisherService } from '../audit/audit-publisher.service';
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -16,6 +17,7 @@ export class ReservationsService {
     private readonly prisma: PrismaService,
     private readonly payments: PaymentsService,
     private readonly email: EmailService,
+    @Optional() private readonly audit?: AuditPublisherService,
   ) {}
 
   private haversineKm(aLat: number, aLng: number, bLat: number, bLng: number): number {
@@ -74,13 +76,13 @@ export class ReservationsService {
     return { quantity: dto.quantity, orderType: dto.orderType, unitPrice, deliveryFee, ...amounts };
   }
 
-  async createReservation(userId: string, dto: CreateReservationDto) {
+  async createReservation(userId: string, dto: CreateReservationDto, userEmail?: string) {
     const { availability, unitPrice, deliveryFee, amounts } = await this.quote(userId, dto);
 
     const total = await this.prisma.reservation.count();
     const invoiceNumber = 'CL-' + String(total + 1).padStart(6, '0');
 
-    return this.prisma.reservation.create({
+    const reservation = await this.prisma.reservation.create({
       data: {
         invoiceNumber,
         userId,
@@ -105,16 +107,24 @@ export class ReservationsService {
         deliveryLng: dto.orderType === 'delivery' ? dto.deliveryLng : null,
       },
     });
+    void this.audit?.publish({
+      entity: 'reservation',
+      action: 'create',
+      userId,
+      userEmail: userEmail ?? dto.customer.email,
+      data: { after: reservation },
+    });
+    return reservation;
   }
 
-  async payReservation(userId: string, id: string, card: PayReservationDto) {
+  async payReservation(userId: string, id: string, card: PayReservationDto, userEmail?: string) {
     const reservation = await this.prisma.reservation.findUnique({ where: { id } });
     if (!reservation || reservation.userId !== userId) throw new NotFoundException('Reserva no encontrada.');
     if (reservation.status === 'cancelled') throw new BadRequestException('La reserva fue cancelada.');
     if (reservation.status === 'expired') throw new BadRequestException('La reserva expiró. Crea una nueva.');
     if (reservation.status === 'confirmed') throw new BadRequestException('La reserva ya está pagada.');
 
-    this.payments.charge(Number(reservation.deposit), card);
+    const payment = this.payments.charge(Number(reservation.deposit), card);
 
     const emailSent = await this.email.sendInvoice({
       invoiceNumber: reservation.invoiceNumber,
@@ -142,25 +152,66 @@ export class ReservationsService {
       where: { id },
       data: { status: 'confirmed', emailSent },
     });
+    void this.audit?.publish({
+      entity: 'payment',
+      action: 'pay',
+      userId,
+      userEmail: userEmail ?? reservation.customerEmail,
+      data: {
+        reservationId: reservation.id,
+        invoiceNumber: reservation.invoiceNumber,
+        amount: Number(reservation.deposit),
+        payment,
+      },
+    });
+    void this.audit?.publish({
+      entity: 'reservation',
+      action: 'update',
+      userId,
+      userEmail: userEmail ?? reservation.customerEmail,
+      data: { before: reservation, after: updated, operation: 'payment_confirmed' },
+    });
     return { reservation: updated, emailSent };
   }
 
-  async cancelReservation(userId: string, id: string) {
+  async cancelReservation(userId: string, id: string, userEmail?: string) {
     const reservation = await this.prisma.reservation.findUnique({ where: { id } });
     if (!reservation || reservation.userId !== userId) throw new NotFoundException('Reserva no encontrada.');
     if (reservation.status === 'cancelled') throw new BadRequestException('La reserva ya está cancelada.');
     if (reservation.status === 'expired') throw new BadRequestException('La reserva ya expiró.');
-    return this.prisma.reservation.update({ where: { id }, data: { status: 'cancelled' } });
+    const updated = await this.prisma.reservation.update({ where: { id }, data: { status: 'cancelled' } });
+    void this.audit?.publish({
+      entity: 'reservation',
+      action: 'cancel',
+      userId,
+      userEmail: userEmail ?? reservation.customerEmail,
+      data: { before: reservation, after: updated },
+    });
+    return updated;
   }
 
   // Limpieza: las reservas sin pagar expiran a las 24 horas.
   @Cron(CronExpression.EVERY_HOUR)
   async expireStale(): Promise<number> {
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const stale = typeof (this.prisma.reservation as any).findMany === 'function'
+      ? await this.prisma.reservation.findMany({
+          where: { status: 'pending_payment', createdAt: { lt: cutoff } },
+        })
+      : [];
     const { count } = await this.prisma.reservation.updateMany({
       where: { status: 'pending_payment', createdAt: { lt: cutoff } },
       data: { status: 'expired' },
     });
+    for (const reservation of stale) {
+      void this.audit?.publish({
+        entity: 'reservation',
+        action: 'expire',
+        userId: reservation.userId,
+        userEmail: reservation.customerEmail,
+        data: { before: reservation, after: { ...reservation, status: 'expired' } },
+      });
+    }
     if (count > 0) this.logger.log(`Reservas pendientes expiradas: ${count}`);
     return count;
   }

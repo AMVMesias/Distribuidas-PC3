@@ -9,6 +9,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { ReservationsModule } from './modules/reservations/reservations.module';
 import { ReviewsModule } from './modules/reviews/reviews.module';
+import { AuditModule } from './modules/audit/audit.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { ReviewsModule } from './modules/reviews/reviews.module';
     }),
     ScheduleModule.forRoot(),
     PrismaModule,
+    AuditModule,
     HealthModule,
     AuthModule,
     CatalogModule,

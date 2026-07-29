@@ -16,7 +16,7 @@ export class ReservationsController {
   @Post()
   @ApiOperation({ summary: 'Crear una reserva (pendiente de pago) y devolver el desglose' })
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateReservationDto) {
-    return this.service.createReservation(user.userId, dto);
+    return this.service.createReservation(user.userId, dto, user.email);
   }
 
   @Post('preview')
@@ -28,13 +28,13 @@ export class ReservationsController {
   @Post(':id/pay')
   @ApiOperation({ summary: 'Pagar la seña (simulado), confirmar y enviar la factura por correo' })
   pay(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: PayReservationDto) {
-    return this.service.payReservation(user.userId, id, dto);
+    return this.service.payReservation(user.userId, id, dto, user.email);
   }
 
   @Post(':id/cancel')
   @ApiOperation({ summary: 'Cancelar una reserva propia' })
   cancel(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    return this.service.cancelReservation(user.userId, id);
+    return this.service.cancelReservation(user.userId, id, user.email);
   }
 
   @Get('me')

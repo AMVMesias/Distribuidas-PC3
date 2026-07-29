@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Trazabilidad en tiempo real del ecosistema CavaLocal">
+  <title>CavaLocal · Auditoría en vivo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/dashboard/styles.css">
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <a class="brand" href="/dashboard/" aria-label="CavaLocal Auditoría">
+        <span class="brand-mark">C</span>
+        <span><strong>CavaLocal</strong><small>Centro de auditoría</small></span>
+      </a>
+      <div id="connection" class="connection connecting" role="status">
+        <span class="pulse"></span><span>Conectando…</span>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div>
+          <p class="eyebrow">TRAZABILIDAD DISTRIBUIDA</p>
+          <h1>Todo lo que ocurre,<br><em>en el momento que ocurre.</em></h1>
+          <p class="intro">Supervisa las acciones del marketplace desde RabbitMQ hasta su persistencia, en una vista clara y en tiempo real.</p>
+        </div>
+        <div class="stats" aria-label="Resumen de eventos">
+          <article><span id="total">—</span><small>eventos encontrados</small></article>
+          <article><span id="visible">—</span><small>en esta página</small></article>
+          <article><span id="updated">—</span><small>última actualización</small></article>
+        </div>
+      </section>
+
+      <section class="workspace">
+        <form id="filters" class="filters">
+          <div>
+            <label for="entity">Entidad</label>
+            <select id="entity" name="entity">
+              <option value="">Todas</option>
+              <option value="user">Usuarios</option>
+              <option value="reservation">Reservas</option>
+              <option value="payment">Pagos</option>
+              <option value="wine">Vinos</option>
+              <option value="store">Tiendas</option>
+            </select>
+          </div>
+          <div>
+            <label for="action">Acción</label>
+            <select id="action" name="action">
+              <option value="">Todas</option>
+              <option value="create">Creación</option>
+              <option value="update">Actualización</option>
+              <option value="pay">Pago</option>
+              <option value="cancel">Cancelación</option>
+              <option value="expire">Expiración</option>
+              <option value="delete">Eliminación</option>
+            </select>
+          </div>
+          <div class="user-filter">
+            <label for="user">Usuario</label>
+            <input id="user" name="user" type="search" placeholder="ID o correo electrónico">
+          </div>
+          <button type="submit">Aplicar filtros</button>
+          <button id="clear" type="button" class="ghost">Limpiar</button>
+        </form>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Evento</th><th>Acción</th><th>Usuario</th><th>Momento</th><th></th></tr>
+            </thead>
+            <tbody id="events">
+              <tr><td colspan="5" class="empty">Cargando auditorías…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div id="cards" class="cards"></div>
+        <footer class="pager">
+          <button id="previous" class="ghost" type="button">← Anterior</button>
+          <span id="page">Página 1</span>
+          <button id="next" class="ghost" type="button">Siguiente →</button>
+        </footer>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="detail">
+    <div class="modal-head">
+      <div><p class="eyebrow">DETALLE DEL EVENTO</p><h2 id="detail-title">Auditoría</h2></div>
+      <button id="close-detail" type="button" aria-label="Cerrar">×</button>
+    </div>
+    <div id="detail-meta" class="detail-meta"></div>
+    <pre id="detail-json"></pre>
+  </dialog>
+  <div id="toast" class="toast" aria-live="polite"></div>
+  <script type="module" src="/dashboard/app.js"></script>
+</body>
+</html>

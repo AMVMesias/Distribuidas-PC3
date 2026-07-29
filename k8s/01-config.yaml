@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cavalocal-config
+  namespace: cavalocal
+data:
+  NODE_ENV: production
+  PORT: "3001"
+  CORS_ORIGINS: "http://conjunta3p.espe.edu.ec"
+  JWT_EXPIRES_IN: "1d"
+  RABBITMQ_URL: "amqp://cavalocal:cavalocal-rabbit@rabbitmq:5672"
+  AUDIT_EXCHANGE: audit.events
+  AUDIT_QUEUE: audit.events.queue
+  AUDIT_NOTIFICATION_EXCHANGE: audit.notifications
+  AUDIT_BUFFER_SIZE: "500"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+  namespace: cavalocal
+data:
+  01-create-audit-db.sql: |
+    CREATE DATABASE cavalocal_audit;
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cavalocal-secrets
+  namespace: cavalocal
+type: Opaque
+stringData:
+  POSTGRES_USER: postgres
+  POSTGRES_PASSWORD: cavalocal-postgres
+  JWT_SECRET: cavalocal-jwt-academico-cambiar-en-produccion
+  BACKEND_DATABASE_URL: postgresql://postgres:cavalocal-postgres@postgres:5432/cavalocal?schema=public
+  AUDIT_DATABASE_URL: postgresql://postgres:cavalocal-postgres@postgres:5432/cavalocal_audit?schema=public
+  RABBITMQ_DEFAULT_USER: cavalocal
+  RABBITMQ_DEFAULT_PASS: cavalocal-rabbit
